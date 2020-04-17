@@ -1,0 +1,34 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <link rel="stylesheet" type="text/css" href="index.css">
+  <script src="https://d3js.org/d3.v5.min.js"></script>
+  <script src="scatter_matrix.js"></script>
+  <title>Scatter Matrix</title>
+</head>
+
+<body>
+  <div id="container">
+    <!-- <button onclick="toggleKDE()">Show KDE</button> -->
+  </div>
+  <script>
+    var scattermatrix = scatterMatrix()
+      .width(600)
+      .height(600);
+    d3.json('everlane_out.json').then(function (data) {
+      data = data.map((d) => d.Sales);
+      scattermatrix.data(data);
+      d3.select('#container').call(scattermatrix);
+    })
+
+    // function toggleKDE() {
+    //   var kdepath = d3.select('#container').selectAll('.kdepath');
+    //   kdepath.classed("hiddenKDE", !kdepath.classed('hiddenKDE'));
+    // }
+  </script>
+</body>
+
+</html>
