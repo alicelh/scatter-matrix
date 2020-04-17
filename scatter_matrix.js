@@ -17,6 +17,7 @@ function scatterMatrix() {
     .curve(d3.curveBasis),
     color = '#aaaaaa',
     axis_color = '#eeeeee',
+    selectedColor = '#1f77b4',
     brushCell,
     svg;
 
@@ -227,7 +228,7 @@ function scatterMatrix() {
             return size - padding / 2 - histScale[p.x](d.length / data.length);
           })
           .style("fill", function (d) {
-            return 'blue';
+            return selectedColor;
           });
       }
 
