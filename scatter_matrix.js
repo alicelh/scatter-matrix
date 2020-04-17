@@ -11,17 +11,20 @@ function scatterMatrix() {
     padding = 20,
     x = d3.scaleLinear(),
     y = d3.scaleLinear(),
+    histScale = [],
     domainByTrait = {},
     line = d3.line()
     .curve(d3.curveBasis),
     color = '#aaaaaa',
-    axis_color = '#eeeeee';
+    axis_color = '#eeeeee',
+    brushCell,
+    svg;
 
   //Create function to export
   function chart(selection) {
     selection.each(function () {
       // Create svg
-      var svg = d3.select(this).append('svg')
+      svg = d3.select(this).append('svg')
         .attr('width', width + margin.left + margin.right)
         .attr('height', height + margin.top + margin.bottom)
         .append('g')
@@ -37,6 +40,7 @@ function scatterMatrix() {
         domainByTrait[column] = d3.extent(data, function (d) {
           return +d[column];
         });
+        histScale[column] = d3.scaleLinear().range([size - padding / 2, padding / 2]);
       });
 
       var formatSiPrefix = d3.format("3,.1s");
@@ -114,6 +118,120 @@ function scatterMatrix() {
     })
   }
 
+  function brush(cell) {
+    var brush = d3.brush()
+      .extent([
+        [padding / 2, padding / 2],
+        [size - padding / 2, size - padding / 2]
+      ])
+      .on("start", brushstart)
+      .on("brush", brushmove)
+      .on("end", brushend);
+
+    cell.call(brush);
+
+    // Clear the previously-active brush, if any.
+    function brushstart(p) {
+      if (brushCell !== this) {
+        d3.select(brushCell).call(brush.move, null);
+        x.domain(domainByTrait[p.x]);
+        y.domain(domainByTrait[p.y]);
+        brushCell = this;
+      }
+    }
+
+    // Highlight the selected circles.
+    function brushmove(p) {
+      if (d3.event.selection === null) return;
+      var [
+        [x0, y0],
+        [x1, y1]
+      ] = d3.event.selection;
+      x0 = x.invert(x0);
+      x1 = x.invert(x1);
+      y0 = y.invert(y0);
+      y1 = y.invert(y1);
+      svg.selectAll("circle.data").classed("selected", d => {
+        return x0 <= d[p.x] &&
+          x1 >= d[p.x] &&
+          y1 <= d[p.y] &&
+          y0 >= d[p.y];
+      });
+      selectedHistaogram(p, x0, x1, y0, y1);
+    }
+
+    // If the brush is empty, select all circles.
+    function brushend() {
+      if (d3.event.selection !== null) return;
+      svg.selectAll(".selected").classed("selected", false);
+      selectedHistaogram();
+    }
+  }
+
+  function selectedHistaogram(label, x0, x1, y0, y1) {
+    if (arguments.length === 0) {
+      svg.selectAll('.histogramCell').each(function () {
+        var cell = d3.select(this);
+        cell.selectAll(".selectedbar").remove();
+      })
+      return;
+    }
+    svg.selectAll('.histogramCell').each(function (p) {
+      var cell = d3.select(this);
+
+      x.domain(domainByTrait[p.x]);
+
+      var histData = data.filter(function (d) {
+        if (x0 <= d[label.x] && x1 >= d[label.x] && y1 <= d[label.y] &&
+          y0 >= d[label.y]) {
+          return true;
+        } else {
+          return false;
+        }
+      });
+
+      histData = histData.map(function (d) {
+        return +d[p.x];
+      });
+
+      if (histData.length > 0) {
+        var thresholds = x.ticks(20);
+
+        var hist = d3.histogram()
+          .thresholds(thresholds)
+          (histData);
+
+        cell.selectAll(".selectedbar").remove();
+
+        var bar = cell.selectAll(".selectedbar")
+          .data(hist);
+
+        bar.enter().append("g")
+          .attr("class", "selectedbar")
+          .classed("histogram", true)
+          .attr("transform", function (d) {
+            return "translate(" + x(findNearestSmall(d.x0)) + "," + histScale[p.x](d.length / data.length) + ")";
+          }).append("rect")
+          .attr("x", 1)
+          .attr("width", d => x(thresholds[1]) - x(thresholds[0]))
+          .attr("height", function (d) {
+            return size - padding / 2 - histScale[p.x](d.length / data.length);
+          })
+          .style("fill", function (d) {
+            return 'blue';
+          });
+      }
+
+      function findNearestSmall(d) {
+        for (let i = 0; i < thresholds.length; i++) {
+          if (thresholds[i] >= d) {
+            if (i === 0) return thresholds[0];
+            return thresholds[i - 1];
+          }
+        }
+      }
+    })
+  }
 
   // for kde line
   function epanechnikov(bandwidth) {
@@ -165,13 +283,15 @@ function scatterMatrix() {
         return y(d[p.y]);
       })
       .attr("r", 2)
-      .style("fill", function (d) {
+      .attr("fill", function (d) {
         return color;
       });
+
+    cell.call(brush);
   }
 
   function plotHistogram(p) {
-    var cell = d3.select(this);
+    var cell = d3.select(this).attr('class', 'histogramCell');
 
     x.domain(domainByTrait[p.x]);
     y.domain(domainByTrait[p.y]);
@@ -192,15 +312,14 @@ function scatterMatrix() {
     var thresholds = x.ticks(20);
 
     // Generate a histogram using twenty uniformly-spaced bins.
-    var hist = d3.histogram()
+    hist = d3.histogram()
       .thresholds(thresholds)
       (histData);
 
-    var histScale = d3.scaleLinear()
-      .domain([0, d3.max(hist, function (d) {
-        return d.length / data.length;
-      })])
-      .range([size - padding / 2, padding / 2]);
+
+    histScale[p.x].domain([0, d3.max(hist, function (d) {
+      return d.length / data.length;
+    })]);
 
     var bar = cell.selectAll(".bar")
       .data(hist)
@@ -208,14 +327,14 @@ function scatterMatrix() {
       .attr("class", "bar")
       .classed("histogram", true)
       .attr("transform", function (d) {
-        return "translate(" + x(d.x0) + "," + histScale(d.length / data.length) + ")";
+        return "translate(" + x(d.x0) + "," + histScale[p.x](d.length / data.length) + ")";
       });
 
     bar.append("rect")
       .attr("x", 1)
       .attr("width", d => x(d.x1) - x(d.x0))
       .attr("height", function (d) {
-        return size - padding / 2 - histScale(d.length / data.length);
+        return size - padding / 2 - histScale[p.x](d.length / data.length);
       })
       .style("fill", function (d) {
         return color;

@@ -1,3 +1,7 @@
 .hiddenKDE {
   visibility: hidden;
 }
+
+.selected {
+  fill: blue;
+}
