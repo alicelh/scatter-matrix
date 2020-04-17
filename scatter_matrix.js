@@ -118,6 +118,9 @@ function scatterMatrix() {
     })
   }
 
+  // ----------------------------------------------------
+  // brush on scatter plot and highlight the selected data
+  // ----------------------------------------------------
   function brush(cell) {
     var brush = d3.brush()
       .extent([
@@ -168,7 +171,11 @@ function scatterMatrix() {
     }
   }
 
+  // ----------------------------------------------------------------
+  // add new hitogram for selected data when brushing on scatter plot
+  // ----------------------------------------------------------------
   function selectedHistaogram(label, x0, x1, y0, y1) {
+    // remove the new hitogram when brush ends
     if (arguments.length === 0) {
       svg.selectAll('.histogramCell').each(function () {
         var cell = d3.select(this);
@@ -176,6 +183,7 @@ function scatterMatrix() {
       })
       return;
     }
+    // filter the selected data and update new histogram for selected data
     svg.selectAll('.histogramCell').each(function (p) {
       var cell = d3.select(this);
 
@@ -194,6 +202,7 @@ function scatterMatrix() {
         return +d[p.x];
       });
 
+      // having scatters in brush area
       if (histData.length > 0) {
         var thresholds = x.ticks(20);
 
@@ -258,6 +267,9 @@ function scatterMatrix() {
     return c;
   }
 
+  // ----------------------------------------------------
+  // draw scatter plot
+  // ----------------------------------------------------
   function plot(p) {
     var cell = d3.select(this);
 
@@ -290,6 +302,9 @@ function scatterMatrix() {
     cell.call(brush);
   }
 
+  // ----------------------------------------------------
+  // draw histogram plot
+  // ----------------------------------------------------
   function plotHistogram(p) {
     var cell = d3.select(this).attr('class', 'histogramCell');
 
