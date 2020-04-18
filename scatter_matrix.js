@@ -241,6 +241,7 @@ function scatterMatrix() {
             return thresholds[i];
           }
         }
+        return thresholds[thresholds.length - 1];
       }
     })
   }
