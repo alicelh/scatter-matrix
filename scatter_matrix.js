@@ -15,6 +15,7 @@ function scatterMatrix() {
     domainByTrait = {},
     line = d3.line()
     .curve(d3.curveBasis),
+    binCount = 20,
     color = '#aaaaaa',
     axis_color = '#eeeeee',
     selectedColor = '#1f77b4',
@@ -138,8 +139,6 @@ function scatterMatrix() {
     function brushstart(p) {
       if (brushCell !== this) {
         d3.select(brushCell).call(brush.move, null);
-        x.domain(domainByTrait[p.x]);
-        y.domain(domainByTrait[p.y]);
         brushCell = this;
       }
     }
@@ -147,6 +146,8 @@ function scatterMatrix() {
     // Highlight the selected circles.
     function brushmove(p) {
       if (d3.event.selection === null) return;
+      x.domain(domainByTrait[p.x]);
+      y.domain(domainByTrait[p.y]);
       var [
         [x0, y0],
         [x1, y1]
@@ -161,21 +162,22 @@ function scatterMatrix() {
           y1 <= d[p.y] &&
           y0 >= d[p.y];
       });
-      selectedHistaogram(p, x0, x1, y0, y1);
+      // update histogram
+      selectedHistogram(p, x0, x1, y0, y1);
     }
 
     // If the brush is empty, select all circles.
     function brushend() {
       if (d3.event.selection !== null) return;
       svg.selectAll(".selected").classed("selected", false);
-      selectedHistaogram();
+      selectedHistogram();
     }
   }
 
   // ----------------------------------------------------------------
   // add new hitogram for selected data when brushing on scatter plot
   // ----------------------------------------------------------------
-  function selectedHistaogram(label, x0, x1, y0, y1) {
+  function selectedHistogram(label, x0, x1, y0, y1) {
     // remove the new hitogram when brush ends
     if (arguments.length === 0) {
       svg.selectAll('.histogramCell').each(function () {
@@ -205,7 +207,8 @@ function scatterMatrix() {
 
       // having scatters in brush area
       if (histData.length > 0) {
-        var thresholds = x.ticks(20);
+        // var thresholds = x.ticks(20);
+        var thresholds = d3.range(domainByTrait[p.x][0], domainByTrait[p.x][1], (domainByTrait[p.x][1] - domainByTrait[p.x][0]) / binCount);
 
         var hist = d3.histogram()
           .thresholds(thresholds)
@@ -235,8 +238,7 @@ function scatterMatrix() {
       function findNearestSmall(d) {
         for (let i = 0; i < thresholds.length; i++) {
           if (thresholds[i] >= d) {
-            if (i === 0) return thresholds[0];
-            return thresholds[i - 1];
+            return thresholds[i];
           }
         }
       }
@@ -325,13 +327,13 @@ function scatterMatrix() {
       return +d[p.x];
     });
 
-    var thresholds = x.ticks(20);
+    // var thresholds = x.ticks(20);
+    var thresholds = d3.range(domainByTrait[p.x][0], domainByTrait[p.x][1], (domainByTrait[p.x][1] - domainByTrait[p.x][0]) / binCount)
 
     // Generate a histogram using twenty uniformly-spaced bins.
     hist = d3.histogram()
       .thresholds(thresholds)
       (histData);
-
 
     histScale[p.x].domain([0, d3.max(hist, function (d) {
       return d.length / data.length;
@@ -342,13 +344,13 @@ function scatterMatrix() {
       .enter().append("g")
       .attr("class", "bar")
       .classed("histogram", true)
-      .attr("transform", function (d) {
-        return "translate(" + x(d.x0) + "," + histScale[p.x](d.length / data.length) + ")";
+      .attr("transform", function (d, i) {
+        return "translate(" + x(thresholds[i]) + "," + histScale[p.x](d.length / data.length) + ")";
       });
 
     bar.append("rect")
       .attr("x", 1)
-      .attr("width", d => x(d.x1) - x(d.x0))
+      .attr("width", d => x(thresholds[1]) - x(thresholds[0]))
       .attr("height", function (d) {
         return size - padding / 2 - histScale[p.x](d.length / data.length);
       })
