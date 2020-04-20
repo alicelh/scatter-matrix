@@ -20,7 +20,12 @@ function scatterMatrix() {
     axis_color = '#eeeeee',
     selectedColor = '#1f77b4',
     brushCell,
-    svg;
+    svg,
+    labels = {
+      'amount': '价格',
+      'buyers': '买家',
+      'quantity': '数量'
+    };
 
   //Create function to export
   function chart(selection) {
@@ -116,7 +121,7 @@ function scatterMatrix() {
         .attr("y", padding)
         .attr('text-anchor', 'end')
         .attr("dy", ".71em")
-        .text(d => d);
+        .text(d => labels[d]);
     })
   }
 
