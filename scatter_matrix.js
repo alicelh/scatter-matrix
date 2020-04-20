@@ -121,6 +121,87 @@ function scatterMatrix() {
   }
 
   // ----------------------------------------------------
+  // brush on histogram chart and highlight the selected data
+  // ----------------------------------------------------
+  function brushOnHistogram(cell) {
+    var brush = d3.brushX()
+      .extent([
+        [padding / 2, padding / 2],
+        [size - padding / 2, size - padding / 2]
+      ])
+      .on("start", brushstart)
+      .on("brush", brushmove)
+      .on("end", brushend);
+
+    cell.call(brush);
+    var thresholds;
+
+    function brushstart(p) {
+      if (brushCell !== this) {
+        thresholds = d3.range(domainByTrait[p.x][0], domainByTrait[p.x][1], (domainByTrait[p.x][1] - domainByTrait[p.x][0]) / binCount);
+        d3.select(brushCell).call(brush.move, null);
+        brushCell = this;
+      }
+    }
+
+    // Highlight the selected circles.
+    function brushmove(p) {
+      if (!d3.event.sourceEvent) return;
+      if (d3.event.selection === null) return;
+      svg.selectAll(".selected").classed("selected", false);
+      selectedHistogram();
+      x.domain(domainByTrait[p.x]);
+      var [
+        x0, x1
+      ] = d3.brushSelection(brushCell);
+      x0 = x.invert(x0);
+      x1 = x.invert(x1);
+      x0 = findNearest(x0, 0, p.x);
+      x1 = findNearest(x1, 1, p.x);
+      svg.selectAll("circle.data").classed("selected", d => {
+        return x0 <= d[p.x] &&
+          x1 >= d[p.x]
+      });
+      selectedHistogram(p, x0, x1, x1, x0);
+      // d3.select(brushCell).selectAll(".bar rect").classed("selected", d => {
+      //   console.log(x0, x1)
+      //   return x0 <= d.x0 &&
+      //     x1 >= d.x1
+      // });
+    }
+
+    // return the histogram bar start value according to the argument
+    function findNearest(d, isabove, label) {
+      for (let i = 0; i < thresholds.length; i++) {
+        if (thresholds[i] === d) {
+          return thresholds[i];
+        }
+        if (thresholds[i] > d) {
+          if (isabove) return thresholds[i];
+          else return thresholds[i - 1];
+        }
+      }
+      if (isabove) return domainByTrait[label][1];
+      else return thresholds[thresholds.length - 1];
+    }
+
+    // If the brush is empty, select all circles.
+    function brushend(p) {
+      if (!d3.event.sourceEvent) return;
+      if (!d3.event.selection) return;
+      var [
+        x0, x1
+      ] = d3.brushSelection(brushCell);
+      x0 = x.invert(x0);
+      x1 = x.invert(x1);
+      x0 = findNearest(x0, 0, p.x);
+      x1 = findNearest(x1, 1, p.x);
+      d3.select(this).transition().call(brush.move, [x(x0), x(x1)]);
+      // selectedHistogram();
+    }
+  }
+
+  // ----------------------------------------------------
   // brush on scatter plot and highlight the selected data
   // ----------------------------------------------------
   function brush(cell) {
@@ -151,7 +232,7 @@ function scatterMatrix() {
       var [
         [x0, y0],
         [x1, y1]
-      ] = d3.event.selection;
+      ] = d3.brushSelection(brushCell);
       x0 = x.invert(x0);
       x1 = x.invert(x1);
       y0 = y.invert(y0);
@@ -223,9 +304,9 @@ function scatterMatrix() {
           .attr("class", "selectedbar")
           .classed("histogram", true)
           .attr("transform", function (d) {
-            return "translate(" + x(findNearestSmall(d.x0)) + "," + histScale[p.x](d.length / data.length) + ")";
-          }).append("rect")
-          .attr("x", 1)
+            return "translate(" + x(findNearestSmall(d.x0, thresholds)) + "," + histScale[p.x](d.length / data.length) + ")";
+          })
+          .append("rect")
           .attr("width", d => x(thresholds[1]) - x(thresholds[0]))
           .attr("height", function (d) {
             return size - padding / 2 - histScale[p.x](d.length / data.length);
@@ -233,18 +314,21 @@ function scatterMatrix() {
           .style("fill", function (d) {
             return selectedColor;
           });
-      }
 
-      function findNearestSmall(d) {
-        for (let i = 0; i < thresholds.length; i++) {
-          if (thresholds[i] >= d) {
-            return thresholds[i];
+        // return the histogram bar start value according to the argument
+        function findNearestSmall(d, thresholds) {
+          for (let i = 0; i < thresholds.length; i++) {
+            if (thresholds[i] === d) return thresholds[i];
+            if (thresholds[i] > d) {
+              return thresholds[i - 1];
+            }
           }
+          return thresholds[thresholds.length - 1];
         }
-        return thresholds[thresholds.length - 1];
       }
     })
   }
+
 
   // for kde line
   function epanechnikov(bandwidth) {
@@ -350,14 +434,15 @@ function scatterMatrix() {
       });
 
     bar.append("rect")
-      .attr("x", 1)
       .attr("width", d => x(thresholds[1]) - x(thresholds[0]))
       .attr("height", function (d) {
         return size - padding / 2 - histScale[p.x](d.length / data.length);
       })
-      .style("fill", function (d) {
+      .attr("fill", function (d) {
         return color;
       });
+
+    cell.call(brushOnHistogram);
 
     // draw KDE line
     // var bandwidth = 5;
