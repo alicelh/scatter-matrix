@@ -140,10 +140,12 @@ function scatterMatrix() {
 
     cell.call(brush);
     var thresholds;
+    var x0, x1;
 
     function brushstart(p) {
       if (brushCell !== this) {
         thresholds = d3.range(domainByTrait[p.x][0], domainByTrait[p.x][1], (domainByTrait[p.x][1] - domainByTrait[p.x][0]) / binCount);
+        // remove the last brush on other cell
         d3.select(brushCell).call(brush.move, null);
         brushCell = this;
       }
@@ -156,7 +158,7 @@ function scatterMatrix() {
       svg.selectAll(".selected").classed("selected", false);
       selectedHistogram();
       x.domain(domainByTrait[p.x]);
-      var [
+      [
         x0, x1
       ] = d3.brushSelection(brushCell);
       x0 = x.invert(x0);
@@ -165,7 +167,7 @@ function scatterMatrix() {
       x1 = findNearest(x1, 1, p.x);
       svg.selectAll("circle.data").classed("selected", d => {
         return x0 <= d[p.x] &&
-          x1 >= d[p.x]
+          x1 > d[p.x]
       });
       selectedHistogram(p, x0, x1, x1, x0);
       // d3.select(brushCell).selectAll(".bar rect").classed("selected", d => {
@@ -194,13 +196,7 @@ function scatterMatrix() {
     function brushend(p) {
       if (!d3.event.sourceEvent) return;
       if (!d3.event.selection) return;
-      var [
-        x0, x1
-      ] = d3.brushSelection(brushCell);
-      x0 = x.invert(x0);
-      x1 = x.invert(x1);
-      x0 = findNearest(x0, 0, p.x);
-      x1 = findNearest(x1, 1, p.x);
+      x.domain(domainByTrait[p.x]);
       d3.select(this).transition().call(brush.move, [x(x0), x(x1)]);
       // selectedHistogram();
     }
@@ -279,8 +275,8 @@ function scatterMatrix() {
       x.domain(domainByTrait[p.x]);
 
       var histData = data.filter(function (d) {
-        if (x0 <= d[label.x] && x1 >= d[label.x] && y1 <= d[label.y] &&
-          y0 >= d[label.y]) {
+        if (x0 <= d[label.x] && x1 > d[label.x] && y1 <= d[label.y] &&
+          y0 > d[label.y]) {
           return true;
         } else {
           return false;
