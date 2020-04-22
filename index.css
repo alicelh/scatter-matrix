@@ -5,3 +5,7 @@
 .selected {
   fill: #1f77b4;
 }
+
+.axis {
+  shape-rendering: crispEdges;
+}

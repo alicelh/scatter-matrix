@@ -8,7 +8,7 @@ function scatterMatrix() {
     },
     columns = [],
     size = 0,
-    padding = 20,
+    padding = 25,
     x = d3.scaleLinear(),
     y = d3.scaleLinear(),
     histScale = [],
@@ -21,6 +21,9 @@ function scatterMatrix() {
     selectedColor = '#1f77b4',
     brushCell,
     svg,
+    xAxis = d3.axisBottom(),
+    yAxis = d3.axisLeft(),
+    formatSiPrefix = d3.format("3,.1s"),
     labels = {
       'amount': '价格',
       'buyers': '买家',
@@ -50,51 +53,6 @@ function scatterMatrix() {
         histScale[column] = d3.scaleLinear().range([size - padding / 2, padding / 2]);
       });
 
-      var formatSiPrefix = d3.format("3,.1s");
-
-      // Draw Axis
-      var xAxis = d3.axisBottom()
-        .ticks(5)
-        .scale(x)
-        .tickFormat(formatSiPrefix);
-
-      var yAxis = d3.axisLeft()
-        .ticks(5)
-        .scale(y)
-        .tickFormat(formatSiPrefix);
-
-      // Create each x-axis
-      svg.selectAll(".x.axis")
-        .data(columns)
-        .enter().append("g")
-        .attr("class", "x axis")
-        .attr("transform", function (d, i) {
-          return "translate(" + i * size + "," + ((i + 1) * size - padding / 4) + ")";
-        })
-        .each(function (d, i) {
-          x.domain(domainByTrait[d]);
-          xAxis.tickSize(-size * (i + 1) + padding / 4);
-          d3.select(this).call(xAxis)
-            .call(g => g.select(".domain").remove())
-            .call(g => g.selectAll(".tick line").attr("stroke", axis_color));
-        });
-
-      // Create each y-axis
-      svg.selectAll(".y.axis")
-        .data(columns)
-        .enter().append("g")
-        .attr("class", "y axis")
-        .attr("transform", function (d, i) {
-          return "translate(" + (i * size + padding / 4) + "," + i * size + ")";
-        })
-        .each(function (d, i) {
-          y.domain(domainByTrait[d]);
-          yAxis.tickSize(-size * (columns.length - i) + padding / 4);
-          d3.select(this).call(yAxis)
-            .call(g => g.select(".domain").remove())
-            .call(g => g.selectAll(".tick line").attr("stroke", axis_color));
-        });
-
       var cell = svg.selectAll(".cell")
         .data(cross(columns, columns))
         .enter().append("g")
@@ -123,6 +81,52 @@ function scatterMatrix() {
         .attr("dy", ".71em")
         .text(d => labels[d]);
     })
+  }
+
+  // ----------------------------------------------------
+  // Draw axis only one for each column and row
+  // ----------------------------------------------------
+  function drawAxis() {
+    // Draw Axis
+    xAxis.ticks(5)
+      .scale(x)
+      .tickFormat(formatSiPrefix);
+
+    yAxis.ticks(5)
+      .scale(y)
+      .tickFormat(formatSiPrefix);
+
+    // Create each x-axis
+    svg.selectAll(".x.axis")
+      .data(columns)
+      .enter().append("g")
+      .attr("class", "x axis")
+      .attr("transform", function (d, i) {
+        return "translate(" + i * size + "," + ((i + 1) * size - padding / 4) + ")";
+      })
+      .each(function (d, i) {
+        x.domain(domainByTrait[d]);
+        xAxis.tickSize(-size * (i + 1) + padding / 4);
+        d3.select(this).call(xAxis)
+          .call(g => g.select(".domain").remove())
+          .call(g => g.selectAll(".tick line").attr("stroke", axis_color));
+      });
+
+    // Create each y-axis
+    svg.selectAll(".y.axis")
+      .data(columns)
+      .enter().append("g")
+      .attr("class", "y axis")
+      .attr("transform", function (d, i) {
+        return "translate(" + (i * size + padding / 4) + "," + i * size + ")";
+      })
+      .each(function (d, i) {
+        y.domain(domainByTrait[d]);
+        yAxis.tickSize(-size * (columns.length - i) + padding / 4);
+        d3.select(this).call(yAxis)
+          .call(g => g.select(".domain").remove())
+          .call(g => g.selectAll(".tick line").attr("stroke", axis_color));
+      });
   }
 
   // ----------------------------------------------------
@@ -165,16 +169,18 @@ function scatterMatrix() {
       x1 = x.invert(x1);
       x0 = findNearest(x0, 0, p.x);
       x1 = findNearest(x1, 1, p.x);
-      svg.selectAll("circle.data").classed("selected", d => {
-        return x0 <= d[p.x] &&
-          x1 > d[p.x]
-      });
+      if (x1 === domainByTrait[p.x][1]) {
+        svg.selectAll("circle.data").classed("selected", d => {
+          return x0 <= d[p.x] &&
+            x1 >= d[p.x]
+        });
+      } else {
+        svg.selectAll("circle.data").classed("selected", d => {
+          return x0 <= d[p.x] &&
+            x1 > d[p.x]
+        });
+      }
       selectedHistogram(p, x0, x1, x1, x0);
-      // d3.select(brushCell).selectAll(".bar rect").classed("selected", d => {
-      //   console.log(x0, x1)
-      //   return x0 <= d.x0 &&
-      //     x1 >= d.x1
-      // });
     }
 
     // return the histogram bar start value according to the argument
@@ -195,10 +201,13 @@ function scatterMatrix() {
     // If the brush is empty, select all circles.
     function brushend(p) {
       if (!d3.event.sourceEvent) return;
-      if (!d3.event.selection) return;
+      if (!d3.event.selection) {
+        svg.selectAll(".selected").classed("selected", false);
+        selectedHistogram();
+        return;
+      }
       x.domain(domainByTrait[p.x]);
       d3.select(this).transition().call(brush.move, [x(x0), x(x1)]);
-      // selectedHistogram();
     }
   }
 
@@ -274,14 +283,45 @@ function scatterMatrix() {
 
       x.domain(domainByTrait[p.x]);
 
-      var histData = data.filter(function (d) {
-        if (x0 <= d[label.x] && x1 > d[label.x] && y1 <= d[label.y] &&
-          y0 > d[label.y]) {
-          return true;
-        } else {
-          return false;
-        }
-      });
+      var histData;
+      console.log(x0, x1, y0, y1);
+      if (x1 === domainByTrait[p.x][1] && y0 === domainByTrait[p.y][1]) {
+        histData = data.filter(function (d) {
+          if (x0 <= d[label.x] && x1 >= d[label.x] && y1 <= d[label.y] &&
+            y0 >= d[label.y]) {
+            return true;
+          } else {
+            return false;
+          }
+        });
+      } else if (y0 === domainByTrait[p.y][1]) {
+        histData = data.filter(function (d) {
+          if (x0 <= d[label.x] && x1 > d[label.x] && y1 <= d[label.y] &&
+            y0 >= d[label.y]) {
+            return true;
+          } else {
+            return false;
+          }
+        });
+      } else if (x1 === domainByTrait[p.x][1]) {
+        histData = data.filter(function (d) {
+          if (x0 <= d[label.x] && x1 >= d[label.x] && y1 <= d[label.y] &&
+            y0 > d[label.y]) {
+            return true;
+          } else {
+            return false;
+          }
+        });
+      } else {
+        histData = data.filter(function (d) {
+          if (x0 <= d[label.x] && x1 > d[label.x] && y1 <= d[label.y] &&
+            y0 > d[label.y]) {
+            return true;
+          } else {
+            return false;
+          }
+        });
+      }
 
       histData = histData.map(function (d) {
         return +d[p.x];
@@ -359,12 +399,40 @@ function scatterMatrix() {
   // ----------------------------------------------------
   // draw scatter plot
   // ----------------------------------------------------
-  function plot(p) {
+  function plot(p, i) {
     var cell = d3.select(this);
 
     x.domain(domainByTrait[p.x]);
     y.domain(domainByTrait[p.y]);
 
+    // Draw axis
+    xAxis.ticks(5)
+      .scale(x)
+      .tickFormat(formatSiPrefix)
+      .tickSize(-size + padding);
+
+    yAxis.ticks(5)
+      .scale(y)
+      .tickFormat(formatSiPrefix)
+      .tickSize(-size + padding);
+
+    cell.append("g")
+      .attr("class", "x axis")
+      .attr("transform", function () {
+        return "translate( 0, " + (size - padding / 2) + ")";
+      }).call(xAxis)
+      .call(g => g.select(".domain").remove())
+      .call(g => g.selectAll(".tick line").attr("stroke", axis_color));
+
+    cell.append("g")
+      .attr("class", "y axis")
+      .attr("transform", function () {
+        return "translate( " + (padding / 2) + ",0)";
+      }).call(yAxis)
+      .call(g => g.select(".domain").remove())
+      .call(g => g.selectAll(".tick line").attr("stroke", axis_color));
+
+    // draw rect border
     cell.append("rect")
       .style("fill", "none")
       .style("stroke", "#555")
@@ -373,6 +441,7 @@ function scatterMatrix() {
       .attr("width", size - padding)
       .attr("height", size - padding);
 
+    // draw circles
     cell.selectAll("circle.data")
       .data(data)
       .enter().append("circle")
@@ -398,15 +467,6 @@ function scatterMatrix() {
     var cell = d3.select(this).attr('class', 'histogramCell');
 
     x.domain(domainByTrait[p.x]);
-    y.domain(domainByTrait[p.y]);
-
-    cell.append("rect")
-      .style("fill", "none")
-      .style("stroke", "#555")
-      .attr("x", padding / 2)
-      .attr("y", padding / 2)
-      .attr("width", size - padding)
-      .attr("height", size - padding);
 
     // Extract data for histogramming into single array
     var histData = data.map(function (d) {
@@ -424,6 +484,41 @@ function scatterMatrix() {
     histScale[p.x].domain([0, d3.max(hist, function (d) {
       return d.length / data.length;
     })]);
+
+    // Draw axis
+    xAxis.ticks(5)
+      .scale(x)
+      .tickFormat(formatSiPrefix)
+      .tickSize(-size + padding);
+
+    yAxis.ticks(5)
+      .scale(histScale[p.x])
+      .tickFormat(d3.format(".0%"))
+      .tickSize(-size + padding);
+
+    cell.append("g")
+      .attr("class", "x axis")
+      .attr("transform", function () {
+        return "translate( 0, " + (size - padding / 2) + ")";
+      }).call(xAxis)
+      .call(g => g.select(".domain").remove())
+      .call(g => g.selectAll(".tick line").attr("stroke", axis_color));
+
+    cell.append("g")
+      .attr("class", "y axis")
+      .attr("transform", function () {
+        return "translate( " + (padding / 2) + ",0)";
+      }).call(yAxis)
+      .call(g => g.select(".domain").remove())
+      .call(g => g.selectAll(".tick line").attr("stroke", axis_color));
+
+    cell.append("rect")
+      .style("fill", "none")
+      .style("stroke", "#555")
+      .attr("x", padding / 2)
+      .attr("y", padding / 2)
+      .attr("width", size - padding)
+      .attr("height", size - padding);
 
     var bar = cell.selectAll(".bar")
       .data(hist)
