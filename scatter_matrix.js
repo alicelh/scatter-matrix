@@ -9,8 +9,9 @@ function scatterMatrix() {
     columns = [],
     size = 0,
     padding = 25,
-    x = d3.scaleLinear(),
-    y = d3.scaleLinear(),
+    // x = d3.scaleLinear(),
+    x = d3.scaleSqrt(),
+    y = d3.scaleSqrt(),
     histScale = [],
     domainByTrait = {},
     line = d3.line()
@@ -18,17 +19,20 @@ function scatterMatrix() {
     binCount = 20,
     color = '#aaaaaa',
     axis_color = '#eeeeee',
-    selectedColor = '#1f77b4',
+    selectedColor = '#ff7f00',
     brushCell,
     svg,
     xAxis = d3.axisBottom(),
     yAxis = d3.axisLeft(),
-    formatSiPrefix = d3.format("3,.1s"),
-    labels = {
-      'amount': '价格',
-      'buyers': '买家',
-      'quantity': '数量'
-    };
+    formatSiPrefix = function (d) {
+      if (d < 1000) return d;
+      else return d3.format(".1s")(d);
+    }
+  labels = {
+    'amount': '价格',
+    'buyers': '买家',
+    'quantity': '数量'
+  };
 
   //Create function to export
   function chart(selection) {
@@ -50,6 +54,7 @@ function scatterMatrix() {
         domainByTrait[column] = d3.extent(data, function (d) {
           return +d[column];
         });
+        domainByTrait[column][1] = Math.pow(findNearestSqrt(domainByTrait[column][1]), 2);
         histScale[column] = d3.scaleLinear().range([size - padding / 2, padding / 2]);
       });
 
@@ -148,7 +153,8 @@ function scatterMatrix() {
 
     function brushstart(p) {
       if (brushCell !== this) {
-        thresholds = d3.range(domainByTrait[p.x][0], domainByTrait[p.x][1], (domainByTrait[p.x][1] - domainByTrait[p.x][0]) / binCount);
+        var tickValues = getAxisTicks(domainByTrait[p.x][1]);
+        thresholds = tickValues.slice(0, tickValues.length - 1);
         // remove the last brush on other cell
         d3.select(brushCell).call(brush.move, null);
         brushCell = this;
@@ -284,7 +290,6 @@ function scatterMatrix() {
       x.domain(domainByTrait[p.x]);
 
       var histData;
-      console.log(x0, x1, y0, y1);
       if (x1 === domainByTrait[p.x][1] && y0 === domainByTrait[p.y][1]) {
         histData = data.filter(function (d) {
           if (x0 <= d[label.x] && x1 >= d[label.x] && y1 <= d[label.y] &&
@@ -330,7 +335,9 @@ function scatterMatrix() {
       // having scatters in brush area
       if (histData.length > 0) {
         // var thresholds = x.ticks(20);
-        var thresholds = d3.range(domainByTrait[p.x][0], domainByTrait[p.x][1], (domainByTrait[p.x][1] - domainByTrait[p.x][0]) / binCount);
+        // var thresholds = d3.range(domainByTrait[p.x][0], domainByTrait[p.x][1], (domainByTrait[p.x][1] - domainByTrait[p.x][0]) / binCount);
+        var tickValues = getAxisTicks(domainByTrait[p.x][1]);
+        var thresholds = tickValues.slice(0, tickValues.length - 1);
 
         var hist = d3.histogram()
           .thresholds(thresholds)
@@ -405,13 +412,14 @@ function scatterMatrix() {
     x.domain(domainByTrait[p.x]);
     y.domain(domainByTrait[p.y]);
 
+
     // Draw axis
-    xAxis.ticks(5)
+    xAxis.tickValues(getAxisTicks(domainByTrait[p.x][1]))
       .scale(x)
       .tickFormat(formatSiPrefix)
       .tickSize(-size + padding);
 
-    yAxis.ticks(5)
+    yAxis.tickValues(getAxisTicks(domainByTrait[p.y][1]))
       .scale(y)
       .tickFormat(formatSiPrefix)
       .tickSize(-size + padding);
@@ -474,7 +482,10 @@ function scatterMatrix() {
     });
 
     // var thresholds = x.ticks(20);
-    var thresholds = d3.range(domainByTrait[p.x][0], domainByTrait[p.x][1], (domainByTrait[p.x][1] - domainByTrait[p.x][0]) / binCount)
+    // var thresholds = d3.range(x(domainByTrait[p.x][0]), x(domainByTrait[p.x][1]), (domainByTrait[p.x][1] - domainByTrait[p.x][0]) / binCount)
+    // console.log(thresholds);
+    var tickValues = getAxisTicks(domainByTrait[p.x][1]);
+    var thresholds = tickValues.slice(0, tickValues.length - 1);
 
     // Generate a histogram using twenty uniformly-spaced bins.
     hist = d3.histogram()
@@ -485,13 +496,14 @@ function scatterMatrix() {
       return d.length / data.length;
     })]);
 
+
     // Draw axis
-    xAxis.ticks(5)
+    xAxis.tickValues(tickValues)
       .scale(x)
       .tickFormat(formatSiPrefix)
       .tickSize(-size + padding);
 
-    yAxis.ticks(5)
+    yAxis.tickValues(d3.range(0, histScale[p.x].domain()[1], 0.1))
       .scale(histScale[p.x])
       .tickFormat(d3.format(".0%"))
       .tickSize(-size + padding);
@@ -555,6 +567,31 @@ function scatterMatrix() {
     //   .attr("stroke-width", 1.5)
     //   .attr("stroke-linejoin", "round")
     //   .attr("d", line);
+  }
+
+  function findNearestSqrt(d) {
+    let i = 0;
+    while (i * i < d) {
+      i++;
+    }
+    if (i > 12) {
+      while (i % 8 !== 0) {
+        i++;
+      }
+    }
+    return i;
+  }
+
+  function getAxisTicks(d) {
+    let max = Math.sqrt(d);
+    let increment;
+    if (max <= 12) increment = 1;
+    else increment = max / 8;
+    let result = [];
+    for (let i = 0; i <= max; i += increment) {
+      result.push(i * i);
+    }
+    return result;
   }
 
   chart.width = function (_) {

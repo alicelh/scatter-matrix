@@ -3,7 +3,7 @@
 }
 
 .selected {
-  fill: #1f77b4;
+  stroke: #ff7f00;
 }
 
 .axis {
