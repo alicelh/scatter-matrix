@@ -18,8 +18,13 @@
     var scattermatrix = scatterMatrix()
       .width(600)
       .height(600);
-    d3.json('everlane_out.json').then(function (data) {
-      data = data.map((d) => d.Sales);
+    d3.json('vis_data_433.json').then(function (data) {
+      data = data.map((d) => {
+        let row = d.Sales;
+        let color = d.pallettes[0];
+        row.color = `rgb(${color[0]},${color[1]},${color[2]})`;
+        return row;
+      });
       scattermatrix.data(data);
       d3.select('#container').call(scattermatrix);
     })

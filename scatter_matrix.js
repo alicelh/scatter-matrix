@@ -41,7 +41,7 @@ function scatterMatrix() {
         .attr('transform', 'translate(' + margin.left + ',' + margin.top + ')');
 
       // Init setting value
-      columns = d3.keys(data[0]);
+      columns = Object.keys(labels);
       size = (width - (columns.length + 1) * padding) / columns.length + padding;
       x.range([padding / 2, size - padding / 2]);
       y.range([size - padding / 2, padding / 2]);
@@ -454,7 +454,7 @@ function scatterMatrix() {
       })
       .attr("r", 2)
       .attr("fill", function (d) {
-        return color;
+        return d.color;
       });
 
     cell.call(brush);
